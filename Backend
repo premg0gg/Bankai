@@ -1,0 +1,21 @@
+from fastapi import FastAPI, UploadFile
+from celery import Celery
+import whisper
+import tempfile
+
+app = FastAPI()
+celery = Celery('tasks', broker='redis://localhost:6379/0')
+
+@celery.task
+def process_video(video_path):
+    model = whisper.load_model("small")
+    result = model.transcribe(video_path)
+    # Add hook detection and clipping logic
+    return {"clips": ["clip1.mp4", "clip2.mp4"]}
+
+@app.post("/upload")
+async def upload(file: UploadFile):
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp.write(await file.read())
+        task = process_video.delay(tmp.name)
+        return {"task_id": task.id}
